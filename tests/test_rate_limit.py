@@ -23,6 +23,18 @@ def test_requests_over_limit_are_rejected(path):
     assert codes.count(429) == 3
 
 
+def test_concurrent_burst_is_limited():
+    async def run():
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            responses = await asyncio.gather(*[client.get("/quote", headers=HEADERS) for _ in range(LIMIT + 3)])
+            return [r.status_code for r in responses]
+
+    codes = asyncio.run(run())
+    assert codes.count(200) == LIMIT
+    assert codes.count(429) == 3
+
+
 def test_limit_is_shared_across_endpoints():
     async def run():
         transport = httpx.ASGITransport(app=app)
