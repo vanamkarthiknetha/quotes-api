@@ -19,6 +19,16 @@ class CounterStore:
         async with aioredis.from_url(REDIS_URL, decode_responses=True) as client:
             await client.set(key, value)
 
+    async def incr(self, key: str, ttl: int) -> int:
+        # Atomic increment so concurrent requests can't read the same count.
+        await asyncio.sleep(LATENCY)
+        async with aioredis.from_url(REDIS_URL, decode_responses=True) as client:
+            async with client.pipeline(transaction=True) as pipe:
+                pipe.incr(key)
+                pipe.expire(key, ttl, nx=True)
+                count, _ = await pipe.execute()
+            return int(count)
+
     async def delete(self, key: str) -> None:
         async with aioredis.from_url(REDIS_URL, decode_responses=True) as client:
             await client.delete(key)
